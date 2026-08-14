@@ -41,11 +41,7 @@ public class SearchPreprocessor {
     private static final List<InputMatcher> PARSERS =
             new ArrayList<InputMatcher>();
     static {
-        // 1st priority is tv shows
-        PARSERS.add(TvShowMatcher.instance());
-        PARSERS.add(TvShowFolderMatcher.instance());
-        PARSERS.add(TvShowPathMatcher.instance());
-        // then movies
+        // Movies and Stash Scenes
         PARSERS.add(MovieVerbatimMatcher.instance());
         PARSERS.add(MovieDVDMatcher.instance());
         PARSERS.add(MoviePathMatcher.instance());

@@ -200,32 +200,37 @@ public class NfoParser {
         NfoFile result = new NfoFile();
         result.videoFile = video;
 
-        // relocate uri for local files to writeable location to comply with API30
-        Uri videoParent = result.videoFolder = FileUtils.relocateNfoAppPublicDir(FileUtils.getParentUrl(video));
+        Uri rawVideoParent = FileUtils.getParentUrl(video);
         String videoNameNoExt = result.videoFileNameNoExt = FileUtils.getFileNameWithoutExtension(video);
-        if (videoParent == null)
+        if (rawVideoParent == null)
             return result;
 
-        // check for our custom .arcnfo files first
-        Uri movieNfoFile = Uri.withAppendedPath(videoParent, videoNameNoExt + CUSTOM_NFO_EXTENSION);
-        if (fileOk(movieNfoFile)) {
-            result.videoNfo = movieNfoFile;
-            // a custom .archos.nfo episode resolves its show through the parsed show title,
-            // but a regular tvshow.nfo may still be the only show metadata available, so look it up too
-            result.showNfo = findShowNfo(videoParent);
-        } else {
-            // 1. there should be a "videoname.nfo" file
+        Uri relocatedParent = FileUtils.relocateNfoAppPublicDir(rawVideoParent);
+        Uri[] parentsToTry = (relocatedParent != null && !relocatedParent.equals(rawVideoParent))
+                ? new Uri[] { rawVideoParent, relocatedParent }
+                : new Uri[] { rawVideoParent };
+
+        for (Uri videoParent : parentsToTry) {
+            // 1. check for video.nfo
             Uri nfoFile = Uri.withAppendedPath(videoParent, videoNameNoExt + NFO_EXTENSION);
             if (fileOk(nfoFile)) {
+                result.videoFolder = videoParent;
                 result.videoNfo = nfoFile;
-                // 2. there could be a tvshow.nfo file in this or the parent folder if it is a tv show
-                result.showNfo = findShowNfo(videoParent);
-            } else {
-                // 3. single movies in directories could be represented by a movie.nfo file
-                movieNfoFile = Uri.withAppendedPath(videoParent, MOVIE_NFO);
-                if (fileOk(movieNfoFile)) {
-                    result.videoNfo = movieNfoFile;
-                }
+                return result;
+            }
+            // 2. check for video.archos.nfo
+            Uri customNfo = Uri.withAppendedPath(videoParent, videoNameNoExt + CUSTOM_NFO_EXTENSION);
+            if (fileOk(customNfo)) {
+                result.videoFolder = videoParent;
+                result.videoNfo = customNfo;
+                return result;
+            }
+            // 3. check for movie.nfo
+            Uri movieNfo = Uri.withAppendedPath(videoParent, MOVIE_NFO);
+            if (fileOk(movieNfo)) {
+                result.videoFolder = videoParent;
+                result.videoNfo = movieNfo;
+                return result;
             }
         }
         return result;
@@ -277,10 +282,13 @@ public class NfoParser {
             InputStream nfoInputStream = null;
             NfoRootHandler rootHandler = null;
             try {
-                // relocate uri for local files to writeable location to comply with API30
-                nfoInputStream = FileEditorFactoryWithUpnp
-                        .getFileEditorForUrl(FileUtils.relocateNfoAppPublicDirForNfoJpgFiles(
-                                nfo.videoNfo), null).getInputStream();
+                try {
+                    nfoInputStream = FileEditorFactoryWithUpnp.getFileEditorForUrl(nfo.videoNfo, null).getInputStream();
+                } catch (Exception e) {
+                    nfoInputStream = FileEditorFactoryWithUpnp
+                            .getFileEditorForUrl(FileUtils.relocateNfoAppPublicDirForNfoJpgFiles(
+                                    nfo.videoNfo), null).getInputStream();
+                }
                 rootHandler = importContext.getRootHandler();
                 // clear before parsing: handlers are reused across files in a shared
                 // ImportContext, and a previous parse aborted by an exception can leave
@@ -511,11 +519,10 @@ public class NfoParser {
     }
 
     public static boolean isNetworkNfoParseEnabled(Context context) {
+        if (context == null) return true;
         SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(context);
         String prefKey = context.getString(R.string.network_nfo_parse_prefkey);
-        boolean prefDefault = context.getResources().getBoolean(R.bool.network_nfo_parse_default);
-        boolean result = pref.getBoolean(prefKey, prefDefault);
-        return result;
+        return pref.getBoolean(prefKey, true);
     }
 
 }

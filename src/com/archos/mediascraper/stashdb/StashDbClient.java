@@ -47,8 +47,9 @@ public class StashDbClient {
 
     private static final MediaType JSON_MEDIA_TYPE = MediaType.get("application/json; charset=utf-8");
 
-    private final String mEndpointUrl;
-    private final String mApiKey;
+    private final Context mContext;
+    private final String mExplicitEndpointUrl;
+    private final String mExplicitApiKey;
     private final OkHttpClient mHttpClient;
 
     public static class StashPerformer {
@@ -109,14 +110,9 @@ public class StashDbClient {
     }
 
     public StashDbClient(Context context) {
-        String endpoint = PreferenceManager.getDefaultSharedPreferences(context.getApplicationContext())
-                .getString(PREF_STASHDB_URL, DEFAULT_STASHDB_URL);
-        String apiKey = PreferenceManager.getDefaultSharedPreferences(context.getApplicationContext())
-                .getString(PREF_STASHDB_API_KEY, "");
-
-        this.mEndpointUrl = (endpoint != null && !endpoint.trim().isEmpty()) ? endpoint.trim() : DEFAULT_STASHDB_URL;
-        this.mApiKey = apiKey != null ? apiKey.trim() : "";
-
+        this.mContext = context != null ? context.getApplicationContext() : null;
+        this.mExplicitEndpointUrl = null;
+        this.mExplicitApiKey = null;
         this.mHttpClient = new OkHttpClient.Builder()
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(20, TimeUnit.SECONDS)
@@ -124,12 +120,30 @@ public class StashDbClient {
     }
 
     public StashDbClient(String endpointUrl, String apiKey) {
-        this.mEndpointUrl = (endpointUrl != null && !endpointUrl.trim().isEmpty()) ? endpointUrl.trim() : DEFAULT_STASHDB_URL;
-        this.mApiKey = apiKey != null ? apiKey.trim() : "";
+        this.mContext = null;
+        this.mExplicitEndpointUrl = (endpointUrl != null && !endpointUrl.trim().isEmpty()) ? endpointUrl.trim() : DEFAULT_STASHDB_URL;
+        this.mExplicitApiKey = apiKey != null ? apiKey.trim() : "";
         this.mHttpClient = new OkHttpClient.Builder()
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(20, TimeUnit.SECONDS)
                 .build();
+    }
+
+    public String getEndpointUrl() {
+        if (mExplicitEndpointUrl != null) return mExplicitEndpointUrl;
+        if (mContext != null) {
+            String url = PreferenceManager.getDefaultSharedPreferences(mContext).getString(PREF_STASHDB_URL, DEFAULT_STASHDB_URL);
+            if (url != null && !url.trim().isEmpty()) return url.trim();
+        }
+        return DEFAULT_STASHDB_URL;
+    }
+
+    public String getApiKey() {
+        if (mExplicitApiKey != null) return mExplicitApiKey;
+        if (mContext != null) {
+            return PreferenceManager.getDefaultSharedPreferences(mContext).getString(PREF_STASHDB_API_KEY, "").trim();
+        }
+        return "";
     }
 
     private static final String QUERY_FIND_BY_HASH =
@@ -286,13 +300,16 @@ public class StashDbClient {
                 payload.put("variables", variables);
             }
 
+            String endpointUrl = getEndpointUrl();
+            String apiKey = getApiKey();
+
             Request.Builder reqBuilder = new Request.Builder()
-                    .url(mEndpointUrl)
+                    .url(endpointUrl)
                     .post(RequestBody.create(payload.toString(), JSON_MEDIA_TYPE))
                     .header("User-Agent", "Nova-StashDB-Player/1.0");
 
-            if (mApiKey != null && !mApiKey.isEmpty()) {
-                reqBuilder.header("ApiKey", mApiKey);
+            if (apiKey != null && !apiKey.isEmpty()) {
+                reqBuilder.header("ApiKey", apiKey);
             }
 
             try (Response resp = mHttpClient.newCall(reqBuilder.build()).execute()) {

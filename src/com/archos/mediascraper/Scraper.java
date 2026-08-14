@@ -113,8 +113,6 @@ public class Scraper {
         info.aggressiveScan = aggressiveScan;
         info.scrapeFromDB = scrapeFromDB;
 
-        if (info.isTvShow())
-            return mShowScraper.search(info);
         return mMovieScraper.search(info);
     }
 
