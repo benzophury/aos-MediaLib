@@ -81,11 +81,11 @@ public final class StashPreprocessor {
     );
 
     private static final Pattern YYYY_MM_DD = Pattern.compile(
-            "(?:^|[\\b_.-])(19\\d\\d|20\\d\\d)[-_.](\\d{2})[-_.](\\d{2})(?:[\\b_.-]|$)"
+            "(?:^|[\\s_.-])(19\\d\\d|20\\d\\d)[-_.](\\d{2})[-_.](\\d{2})(?:[\\s_.-]|$)"
     );
 
     private static final Pattern YY_MM_DD = Pattern.compile(
-            "(?:^|[\\b_.-])(2[0-9])\\.(\\d{2})\\.(\\d{2})(?:[\\b_.-]|$)"
+            "(?:^|[\\s_.-])(2[0-9])\\.(\\d{2})\\.(\\d{2})(?:[\\s_.-]|$)"
     );
 
     public static class ParsedSceneInfo {
