@@ -58,7 +58,7 @@ public abstract class SearchInfo {
 
     }
 
-    protected final String getUserInput() {
+    public final String getUserInput() {
         return mUserInput;
     }
 

@@ -79,8 +79,19 @@ public class StashScraper extends BaseScraper2 {
         Throwable errorReason = null;
 
         try {
+            // Priority 0: Manual user search query from UI
+            if (info.getUserInput() != null && !info.getUserInput().trim().isEmpty()) {
+                String manualQuery = info.getUserInput().trim();
+                log.info("getMatches2: Performing direct user manual search for '{}'", manualQuery);
+                List<StashDbClient.StashScene> textMatches = mClient.searchScenes(manualQuery);
+                if (textMatches != null && !textMatches.isEmpty()) {
+                    scenes.addAll(textMatches);
+                    status = ScrapeStatus.OKAY;
+                }
+            }
+
             // Step 1: Check for Sidecar UUID (.nfo, .id, .json, .txt)
-            if (localFile != null) {
+            if (scenes.isEmpty() && localFile != null) {
                 String sidecarUuid = StashPreprocessor.detectSidecarStashId(localFile);
                 if (sidecarUuid != null) {
                     log.info("getMatches2: querying StashDB by sidecar UUID: {}", sidecarUuid);
@@ -112,7 +123,7 @@ public class StashScraper extends BaseScraper2 {
                 StashPreprocessor.ParsedSceneInfo parsed = StashPreprocessor.parseFilename(filename);
 
                 String searchTerm = buildSearchTerm(parsed, fallbackName);
-                log.info("getMatches2: querying StashDB text search for: '{}'", searchTerm);
+                log.info("getMatches2: querying StashDB auto text search for: '{}'", searchTerm);
 
                 List<StashDbClient.StashScene> textMatches = mClient.searchScenes(searchTerm);
                 if (textMatches != null && !textMatches.isEmpty()) {
@@ -121,7 +132,7 @@ public class StashScraper extends BaseScraper2 {
                 }
             }
         } catch (IOException e) {
-            log.error("getMatches2: network/API error: {}", e.getMessage());
+            log.error("getMatches2: StashDB API error: {}", e.getMessage(), e);
             status = ScrapeStatus.ERROR;
             errorReason = e;
         }

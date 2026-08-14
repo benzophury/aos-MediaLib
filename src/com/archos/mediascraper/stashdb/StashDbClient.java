@@ -264,19 +264,32 @@ public class StashDbClient {
             return Collections.emptyList();
         }
 
+        String cleanTerm = term.trim();
+        log.info("searchScenes: Querying StashDB for term='{}'", cleanTerm);
+
         try {
             JSONObject variables = new JSONObject();
-            variables.put("term", term.trim());
+            variables.put("term", cleanTerm);
+            variables.put("limit", 25);
 
             JSONObject response = executeQuery(QUERY_SEARCH_SCENES, variables);
             JSONObject data = response.optJSONObject("data");
-            if (data == null) return Collections.emptyList();
+            if (data == null) {
+                log.warn("searchScenes: null data in response for term='{}'", cleanTerm);
+                return Collections.emptyList();
+            }
 
             JSONObject searchScenes = data.optJSONObject("searchScenes");
-            if (searchScenes == null) return Collections.emptyList();
+            if (searchScenes == null) {
+                log.warn("searchScenes: null searchScenes object for term='{}'", cleanTerm);
+                return Collections.emptyList();
+            }
 
             JSONArray scenes = searchScenes.optJSONArray("scenes");
-            if (scenes == null) return Collections.emptyList();
+            if (scenes == null) {
+                log.info("searchScenes: 0 scenes found for term='{}'", cleanTerm);
+                return Collections.emptyList();
+            }
 
             List<StashScene> result = new ArrayList<>();
             for (int i = 0; i < scenes.length(); i++) {
@@ -285,14 +298,22 @@ public class StashDbClient {
                     result.add(parseScene(sc));
                 }
             }
+            log.info("searchScenes: Found {} scenes for term='{}'", result.size(), cleanTerm);
             return result;
         } catch (JSONException e) {
-            log.error("searchScenes: JSON error: {}", e.getMessage());
+            log.error("searchScenes: JSON error: {}", e.getMessage(), e);
             throw new IOException("JSON serialization error", e);
         }
     }
 
     private JSONObject executeQuery(String query, JSONObject variables) throws IOException {
+        String endpointUrl = getEndpointUrl();
+        String apiKey = getApiKey();
+
+        if (apiKey.isEmpty() && endpointUrl.contains("stashdb.org")) {
+            log.warn("executeQuery: StashDB API key is not configured! Please enter your API key in Settings -> Stash Preferences.");
+        }
+
         try {
             JSONObject payload = new JSONObject();
             payload.put("query", query);
@@ -300,28 +321,51 @@ public class StashDbClient {
                 payload.put("variables", variables);
             }
 
-            String endpointUrl = getEndpointUrl();
-            String apiKey = getApiKey();
+            log.debug("executeQuery: POST {} (payload length: {})", endpointUrl, payload.length());
 
             Request.Builder reqBuilder = new Request.Builder()
                     .url(endpointUrl)
                     .post(RequestBody.create(payload.toString(), JSON_MEDIA_TYPE))
                     .header("User-Agent", "Nova-StashDB-Player/1.0");
 
-            if (apiKey != null && !apiKey.isEmpty()) {
+            if (!apiKey.isEmpty()) {
                 reqBuilder.header("ApiKey", apiKey);
             }
 
             try (Response resp = mHttpClient.newCall(reqBuilder.build()).execute()) {
                 if (!resp.isSuccessful()) {
-                    log.warn("executeQuery: HTTP {} - {}", resp.code(), resp.message());
-                    throw new IOException("HTTP error code: " + resp.code());
+                    String errBody = resp.body() != null ? resp.body().string() : "";
+                    log.error("executeQuery: HTTP {} {} - Body: {}", resp.code(), resp.message(), errBody);
+                    throw new IOException("StashDB HTTP error " + resp.code() + ": " + resp.message());
                 }
 
                 String body = resp.body() != null ? resp.body().string() : "{}";
-                return new JSONObject(body);
+                JSONObject json = new JSONObject(body);
+
+                // Check for GraphQL errors
+                JSONArray errors = json.optJSONArray("errors");
+                if (errors != null && errors.length() > 0) {
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 0; i < errors.length(); i++) {
+                        JSONObject err = errors.optJSONObject(i);
+                        if (err != null) {
+                            String msg = err.optString("message", "Unknown GraphQL error");
+                            if (sb.length() > 0) sb.append(", ");
+                            sb.append(msg);
+                        }
+                    }
+                    String errSummary = sb.toString();
+                    log.error("executeQuery: StashDB GraphQL error(s): {}", errSummary);
+                    if (errSummary.toLowerCase().contains("not authorized") || errSummary.toLowerCase().contains("unauthorized")) {
+                        throw new IOException("StashDB Authorization Failed: Check API Key in Settings (" + errSummary + ")");
+                    }
+                    throw new IOException("StashDB Error: " + errSummary);
+                }
+
+                return json;
             }
         } catch (JSONException e) {
+            log.error("executeQuery: JSON parsing error: {}", e.getMessage(), e);
             throw new IOException("Invalid JSON response from StashDB", e);
         }
     }
