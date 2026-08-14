@@ -132,6 +132,16 @@ public class NfoWriter {
                 textTag(serializer, "writer", writer);
             textTag(serializer, "id", tag.getImdbId());
             textTag(serializer, "tmdbid", tag.getOnlineId());
+            if (tag.getImdbId() != null && !tag.getImdbId().isEmpty()) {
+                serializer.startTag("", "uniqueid");
+                serializer.attribute("", "type", "stashdb");
+                serializer.attribute("", "default", "true");
+                serializer.text(tag.getImdbId());
+                serializer.endTag("", "uniqueid");
+            }
+            if (tag.getReleaseDate() != null && !tag.getReleaseDate().isEmpty()) {
+                textTag(serializer, "premiered", tag.getReleaseDate());
+            }
             for (String studio : tag.getStudios())
                 textTag(serializer, "studio", studio);
             for (ScraperTrailer trailer : tag.getTrailers() == null ? java.util.Collections.<ScraperTrailer>emptyList() : tag.getTrailers()) {
@@ -139,6 +149,8 @@ public class NfoWriter {
             }
             for (String genre : tag.getGenres())
                 textTag(serializer, "genre", genre);
+            for (String genre : tag.getGenres())
+                textTag(serializer, "tag", genre);
             for (Entry<String, String> entry : tag.getActors().entrySet()) {
                 serializer.startTag("", "actor");
                 {

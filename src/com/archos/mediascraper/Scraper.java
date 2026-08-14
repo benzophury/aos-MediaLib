@@ -22,8 +22,8 @@ import androidx.preference.PreferenceManager;
 
 import com.archos.mediascraper.preprocess.SearchInfo;
 import com.archos.mediascraper.preprocess.SearchPreprocessor;
+import com.archos.mediascraper.stashdb.StashScraper;
 import com.archos.mediascraper.xml.BaseScraper2;
-import com.archos.mediascraper.xml.MovieScraper3;
 import com.archos.mediascraper.xml.ShowScraper4;
 
 import org.slf4j.Logger;
@@ -34,10 +34,10 @@ import java.util.Locale;
 public class Scraper {
     private static final Logger log = LoggerFactory.getLogger(Scraper.class);
 
-    public final static String TVDB = "tvdb";
+    public final static String STASHDB = "stashdb";
     public final static String TMDB = "tmdb";
     public final static String SHOW_SCRAPER = TMDB;
-    public final static String MOVIE_SCRAPER = TMDB;
+    public final static String MOVIE_SCRAPER = STASHDB;
 
     public static final int ALL_MATCHES = -1;
     public static final String ITEM_TAGS = "tags";
@@ -57,11 +57,11 @@ public class Scraper {
         if (log.isDebugEnabled()) log.debug("CTOR");
         mContext = context;
         mShowScraper = new ShowScraper4(mContext);
-        mMovieScraper = new MovieScraper3(mContext);
+        mMovieScraper = new StashScraper(mContext);
     }
 
     private final ShowScraper4 mShowScraper;
-    private final MovieScraper3 mMovieScraper;
+    private final StashScraper mMovieScraper;
 
     private ScrapeSearchResult getMatches(SearchInfo info, int maxItems) {
         info = SearchPreprocessor.instance().reParseInfo(info);

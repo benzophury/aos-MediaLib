@@ -23,17 +23,11 @@ import com.archos.mediascraper.NfoParser;
 import com.archos.mediascraper.ScraperImage;
 import com.archos.mediascraper.ScraperTrailer;
 import com.archos.mediascraper.StringMatcher;
-import com.archos.mediascraper.themoviedb3.ImageConfiguration;
-import com.archos.mediascraper.themoviedb3.ImageConfiguration.BackdropSize;
-import com.archos.mediascraper.themoviedb3.ImageConfiguration.PosterSize;
-
 import org.xml.sax.Attributes;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-
-import static com.archos.mediascraper.themoviedb3.MovieCollectionImages.downloadCollectionImage;
 
 /**
  * Parser for movie .nfo files as described in
@@ -363,10 +357,15 @@ public class NfoMovieHandler extends BasicSubParseHandler {
                     case UNIQUEID:
                         if ("tmdb".equalsIgnoreCase(mUniqueIdType)) {
                             mUniqueIdTmdb = getLong();
+                        } else if ("stashdb".equalsIgnoreCase(mUniqueIdType) || "stash".equalsIgnoreCase(mUniqueIdType)) {
+                            String stashUuid = getString();
+                            if (stashUuid != null && !stashUuid.isEmpty()) {
+                                mUniqueIdImdb = stashUuid.trim();
+                            }
                         } else if ("imdb".equalsIgnoreCase(mUniqueIdType)) {
                             mUniqueIdImdb = getString();
                         } else {
-                            // consume buffered text for unknown types (e.g. tvdb)
+                            // consume buffered text for unknown types
                             getString();
                         }
                         mUniqueIdType = null;
@@ -536,10 +535,10 @@ public class NfoMovieHandler extends BasicSubParseHandler {
             if (!mMoviePosterUrls.isEmpty()) {
                 ArrayList<ScraperImage> images = new ArrayList<ScraperImage>(mMoviePosterUrls.size());
                 for (String url : mMoviePosterUrls) {
-                    if (url != null && !url.isEmpty() && url.startsWith("http")) {
+                    if (url != null && !url.isEmpty()) {
                         ScraperImage image = new ScraperImage(ScraperImage.Type.MOVIE_POSTER, movieFile.toString());
-                        image.setLargeUrl(ImageConfiguration.rewriteUrl(url, PosterSize.W342));
-                        image.setThumbUrl(ImageConfiguration.rewriteUrl(url, PosterSize.W92));
+                        image.setLargeUrl(url);
+                        image.setThumbUrl(url);
                         image.generateFileNames(context);
                         images.add(image);
                     }
@@ -549,24 +548,16 @@ public class NfoMovieHandler extends BasicSubParseHandler {
             if (!mMovieBackdropUrls.isEmpty()) {
                 ArrayList<ScraperImage> images = new ArrayList<ScraperImage>(mMovieBackdropUrls.size());
                 for (String url : mMovieBackdropUrls) {
-                    if (url != null && !url.isEmpty() && url.startsWith("http")) {
+                    if (url != null && !url.isEmpty()) {
                         ScraperImage image = new ScraperImage(ScraperImage.Type.MOVIE_BACKDROP, movieFile.toString());
-                        image.setLargeUrl(ImageConfiguration.rewriteUrl(url, BackdropSize.W1280));
-                        image.setThumbUrl(ImageConfiguration.rewriteUrl(url, BackdropSize.W300));
+                        image.setLargeUrl(url);
+                        image.setThumbUrl(url);
                         image.generateFileNames(context);
                         images.add(image);
                     }
                 }
                 mMovie.setBackdrops(images);
             }
-
-            if (mMovie.getCollectionId() > 0)
-                downloadCollectionImage(mMovie,
-                        ImageConfiguration.PosterSize.W342,    // large poster
-                        ImageConfiguration.PosterSize.W92,     // thumb poster
-                        ImageConfiguration.BackdropSize.W1280, // large bd
-                        ImageConfiguration.BackdropSize.W300,  // thumb bd
-                        mInSetPosterLarge, context);
 
             mMovie.setFile(movieFile);
             return mMovie;
