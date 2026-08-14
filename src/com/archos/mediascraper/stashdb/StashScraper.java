@@ -24,6 +24,7 @@ import com.archos.mediascraper.ScrapeSearchResult;
 import com.archos.mediascraper.ScrapeStatus;
 import com.archos.mediascraper.ScraperImage;
 import com.archos.mediascraper.SearchResult;
+import com.archos.mediascraper.preprocess.MovieSearchInfo;
 import com.archos.mediascraper.preprocess.SearchInfo;
 import com.archos.mediascraper.xml.BaseScraper2;
 
@@ -42,6 +43,8 @@ import java.util.List;
  */
 public class StashScraper extends BaseScraper2 {
     private static final Logger log = LoggerFactory.getLogger(StashScraper.class);
+    public static final String PREFERENCE_NAME = "StashScraper";
+    public static final String EXTRA_STASH_ID = "stash_id";
 
     private final StashDbClient mClient;
 
@@ -53,6 +56,11 @@ public class StashScraper extends BaseScraper2 {
     public StashScraper(Context context, StashDbClient client) {
         super(context);
         this.mClient = client;
+    }
+
+    @Override
+    protected String internalGetPreferenceName() {
+        return PREFERENCE_NAME;
     }
 
     @Override
@@ -99,10 +107,11 @@ public class StashScraper extends BaseScraper2 {
 
             // Step 3: Text Search via Scene Preprocessor
             if (scenes.isEmpty()) {
-                String filename = (localFile != null) ? localFile.getName() : info.getName();
+                String fallbackName = (info instanceof MovieSearchInfo) ? ((MovieSearchInfo) info).getName() : info.getSearchSuggestion();
+                String filename = (localFile != null) ? localFile.getName() : fallbackName;
                 StashPreprocessor.ParsedSceneInfo parsed = StashPreprocessor.parseFilename(filename);
 
-                String searchTerm = buildSearchTerm(parsed, info.getName());
+                String searchTerm = buildSearchTerm(parsed, fallbackName);
                 log.info("getMatches2: querying StashDB text search for: '{}'", searchTerm);
 
                 List<StashDbClient.StashScene> textMatches = mClient.searchScenes(searchTerm);
@@ -130,29 +139,23 @@ public class StashScraper extends BaseScraper2 {
             sr.setOriginalTitle(sc.title);
             sr.setYear(extractYear(sc.releaseDate));
             sr.setScraper(this);
-            sr.setExtra(sc.id); // Stash UUID
+            Bundle extra = new Bundle();
+            extra.putString(EXTRA_STASH_ID, sc.id);
+            sr.setExtra(extra);
             results.add(sr);
         }
 
         return new ScrapeSearchResult(results, true, ScrapeStatus.OKAY, null);
     }
 
-    public ScrapeDetailResult search(SearchInfo info) {
-        ScrapeSearchResult searchResult = getMatches2(info, 1);
-        if (searchResult.status != ScrapeStatus.OKAY || searchResult.results == null || searchResult.results.isEmpty()) {
-            return new ScrapeDetailResult(null, true, null, searchResult.status, searchResult.reason);
-        }
-
-        SearchResult bestMatch = searchResult.results.get(0);
-        return getDetails(bestMatch, null);
-    }
-
-    public ScrapeDetailResult getDetails(SearchResult result, Bundle options) {
+    @Override
+    protected ScrapeDetailResult getDetailsInternal(SearchResult result, Bundle options) {
         if (result == null) {
             return new ScrapeDetailResult(null, true, null, ScrapeStatus.ERROR, null);
         }
 
-        String sceneId = result.getExtra();
+        Bundle extra = result.getExtra();
+        String sceneId = extra != null ? extra.getString(EXTRA_STASH_ID) : null;
         if (sceneId == null || sceneId.trim().isEmpty()) {
             return new ScrapeDetailResult(null, true, null, ScrapeStatus.ERROR, null);
         }
@@ -166,7 +169,10 @@ public class StashScraper extends BaseScraper2 {
             MovieTags tags = new MovieTags();
             tags.setTitle(scene.title != null && !scene.title.isEmpty() ? scene.title : result.getTitle());
             tags.setPlot(scene.details);
-            tags.setOnlineId(Long.parseLong(scene.id.replaceAll("[^0-9]", "").substring(0, Math.min(8, scene.id.replaceAll("[^0-9]", "").length()))));
+            String numericDigits = scene.id.replaceAll("[^0-9]", "");
+            long numId = numericDigits.length() >= 6 ? Long.parseLong(numericDigits.substring(0, Math.min(8, numericDigits.length()))) : Math.abs(scene.id.hashCode());
+            tags.setOnlineId(numId);
+            tags.setImdbId(scene.id);
             tags.setFile(result.getFile());
 
             if (scene.releaseDate != null && scene.releaseDate.length() >= 4) {
@@ -176,50 +182,55 @@ public class StashScraper extends BaseScraper2 {
             }
 
             if (scene.studio != null && scene.studio.name != null) {
-                tags.addStudio(scene.studio.name);
-                tags.addDirector(scene.studio.name);
+                tags.addStudioIfAbsent(scene.studio.name);
+                tags.addDirectorIfAbsent(scene.studio.name);
             }
 
             // Cis-female performers prioritized
             List<String> cisFemales = scene.getCisFemalePerformerNames();
             for (String femaleName : cisFemales) {
-                tags.addActor(femaleName, "Performer");
+                tags.addActorIfAbsent(femaleName, "Performer");
             }
 
             // Also add all performers
             for (StashDbClient.StashPerformer perf : scene.performers) {
                 if (perf.name != null && !cisFemales.contains(perf.name.trim())) {
-                    tags.addActor(perf.name.trim(), "Actor");
+                    tags.addActorIfAbsent(perf.name.trim(), "Actor");
                 }
             }
 
             // Tags / Genres
             for (String tag : scene.tags) {
-                tags.addGenre(tag);
+                tags.addGenreIfAbsent(tag);
             }
 
             // Posters & Fanart images
             if (mContext != null && scene.images != null) {
+                List<ScraperImage> posters = new ArrayList<>();
+                List<ScraperImage> backdrops = new ArrayList<>();
+
                 for (StashDbClient.StashImage img : scene.images) {
                     if (img.url != null && !img.url.isEmpty()) {
                         ScraperImage poster = new ScraperImage(ScraperImage.Type.MOVIE_POSTER, tags.getTitle());
                         poster.setLargeUrl(img.url);
                         poster.setThumbUrl(img.url);
                         poster.generateFileNames(mContext);
-                        tags.addPoster(poster);
+                        posters.add(poster);
 
                         ScraperImage backdrop = new ScraperImage(ScraperImage.Type.MOVIE_BACKDROP, tags.getTitle());
                         backdrop.setLargeUrl(img.url);
                         backdrop.setThumbUrl(img.url);
                         backdrop.generateFileNames(mContext);
-                        tags.addBackdrop(backdrop);
+                        backdrops.add(backdrop);
                     }
                 }
+                tags.setPosters(posters);
+                tags.setBackdrops(backdrops);
             }
 
             return new ScrapeDetailResult(tags, true, null, ScrapeStatus.OKAY, null);
         } catch (IOException e) {
-            log.error("getDetails: error fetching scene {}: {}", sceneId, e.getMessage());
+            log.error("getDetailsInternal: error fetching scene {}: {}", sceneId, e.getMessage());
             return new ScrapeDetailResult(null, true, null, ScrapeStatus.ERROR, e);
         }
     }
