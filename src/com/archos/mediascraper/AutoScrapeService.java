@@ -789,13 +789,10 @@ public class AutoScrapeService extends Service implements DefaultLifecycleObserv
                                     continue;
                                 }
                                 // THIS IS THE HARD STOP, call setScrapeInProgress(false) from another place
-                                //in the app, like remove shortcut and I will stop the scrape for you.
-                                //Also checks network. We can scrape off 5G, but cant load local NFOs (obviously)
-                                //Question is, do we wait for NFO or just fallback to TMDB?
-                                // TODO: I think fallback is better, and was how NoVa worked previously.
-                                if (!LoaderUtils.getScrapeInProgress() || !NetworkState.isLocalNetworkConnected(AutoScrapeService.this) || !NetworkState.isNetworkConnected(AutoScrapeService.this)) {
+                                // in the app, like remove shortcut and I will stop the scrape for you.
+                                if (!LoaderUtils.getScrapeInProgress()) {
                                     sNumberOfFilesRemainingToProcess = 0;
-                                    log.debug("startScraping disconnected from network or stop requested");
+                                    log.debug("startScraping: stop requested via LoaderUtils");
                                     return;
                                 }
 
@@ -809,6 +806,7 @@ public class AutoScrapeService extends Service implements DefaultLifecycleObserv
                                 String title = cursor.getString(cursor.getColumnIndex(VideoStore.MediaColumns.TITLE));
                                 Uri fileUri = Uri.parse(cursor.getString(cursor.getColumnIndex(VideoStore.MediaColumns.DATA)));
                                 Uri scrapUri = title == null || title.isEmpty() || title.equalsIgnoreCase("null") ? fileUri : Uri.parse("/" + title + ".mp4") ;
+                                log.info("AutoScrapeService: start processing ID={} [title='{}', uri={}]", ID, title, fileUri);
 
                                 //This get the info to reparse for UPNP, and grab the correct details.
                                 boolean reparseInfo = fileUri.toString().toLowerCase().startsWith("upnp");
@@ -819,7 +817,7 @@ public class AutoScrapeService extends Service implements DefaultLifecycleObserv
                                 if (noScrapeError && NfoParser.isNetworkNfoParseEnabled(AutoScrapeService.this) && !fileUri.toString().toLowerCase().startsWith("upnp")) {
                                     BaseTags tags = NfoParser.getTagForFile(fileUri, AutoScrapeService.this);
                                     if (tags != null) {
-                                        if (log.isTraceEnabled()) log.trace("startScraping: found NFO");
+                                        log.info("AutoScrapeService: found local NFO for ID={}, title='{}'", ID, tags.getTitle());
                                         // if poster url are in nfo or in folder, download is automatic
                                         // if no poster available, try to scrap with good title,
                                         if (ID != -1) {
@@ -854,6 +852,7 @@ public class AutoScrapeService extends Service implements DefaultLifecycleObserv
                                                 pendingPersistenceRetryIds.add(ID);
                                             } else {
                                                 nfoPersisted = true;
+                                                log.info("AutoScrapeService: successfully saved local NFO tags for ID={} -> '{}'", ID, title);
                                             }
                                         } else {
                                             if (log.isTraceEnabled()) log.trace("startScraping: oh oh NFO ID = -1 ");
@@ -958,8 +957,7 @@ public class AutoScrapeService extends Service implements DefaultLifecycleObserv
                                             sNumberOfFilesScraped++;
                                             totalNumberOfFilesScraped++;
                                             noScrapeError = true;
-                                            if (log.isTraceEnabled() && result.tag.getTitle() != null)
-                                                log.trace("startScraping: info {}", result.tag.getTitle());
+                                            log.info("AutoScrapeService: online StashDB match saved for ID={} -> '{}'", ID, result.tag.getTitle());
 
                                             //Export the NFO tag if set in prefs (unless we got this from NFO!)
                                             if (exportContext != null) {
