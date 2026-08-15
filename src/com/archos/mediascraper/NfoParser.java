@@ -328,6 +328,11 @@ public class NfoParser {
                             movieTags.addDefaultBackdrop(context, backdrop, nfo.videoFile);
                         }
 
+                        // If no local poster exists and no poster URLs are in the NFO, attempt online StashDB image fetch
+                        if (poster == null && (movieTags.getPosters() == null || movieTags.getPosters().isEmpty())) {
+                            fetchStashDbArtworkForNfo(context, movieTags, nfo.videoFile);
+                        }
+
                         tag.downloadPoster(context);
                         return tag;
                     }
@@ -541,4 +546,62 @@ public class NfoParser {
         return pref.getBoolean(prefKey, true);
     }
 
+    private static void fetchStashDbArtworkForNfo(Context context, MovieTags movieTags, Uri videoFile) {
+        if (context == null || movieTags == null) return;
+        try {
+            com.archos.mediascraper.stashdb.StashDbClient client = new com.archos.mediascraper.stashdb.StashDbClient(context);
+            com.archos.mediascraper.stashdb.StashDbClient.StashScene scene = null;
+            String stashId = movieTags.getImdbId();
+            if (stashId != null && !stashId.trim().isEmpty() && !stashId.startsWith("local_")) {
+                scene = client.findSceneById(stashId.trim());
+            }
+            if (scene == null && videoFile != null && "file".equalsIgnoreCase(videoFile.getScheme())) {
+                java.io.File localFile = new java.io.File(videoFile.getPath());
+                String oshash = com.archos.mediascraper.stashdb.StashDbHasher.computeOsHash(localFile);
+                if (oshash != null) {
+                    java.util.List<com.archos.mediascraper.stashdb.StashDbClient.StashScene> matches = client.findSceneByHash(oshash);
+                    if (matches != null && !matches.isEmpty()) {
+                        scene = matches.get(0);
+                    }
+                }
+            }
+            if (scene == null && movieTags.getTitle() != null && !movieTags.getTitle().trim().isEmpty()) {
+                String searchTerm = movieTags.getTitle().trim();
+                if (movieTags.getDirectorsFormatted() != null && !movieTags.getDirectorsFormatted().trim().isEmpty()) {
+                    searchTerm = movieTags.getTitle().trim() + " " + movieTags.getDirectorsFormatted().trim();
+                }
+                java.util.List<com.archos.mediascraper.stashdb.StashDbClient.StashScene> matches = client.searchScenes(searchTerm);
+                if (matches != null && !matches.isEmpty()) {
+                    scene = matches.get(0);
+                }
+            }
+            if (scene != null && scene.images != null && !scene.images.isEmpty()) {
+                java.util.List<ScraperImage> posters = new java.util.ArrayList<>();
+                java.util.List<ScraperImage> backdrops = new java.util.ArrayList<>();
+                for (com.archos.mediascraper.stashdb.StashDbClient.StashImage img : scene.images) {
+                    if (img.url != null && !img.url.isEmpty()) {
+                        ScraperImage p = new ScraperImage(ScraperImage.Type.MOVIE_POSTER, movieTags.getTitle());
+                        p.setLargeUrl(img.url);
+                        p.setThumbUrl(img.url);
+                        p.generateFileNames(context);
+                        posters.add(p);
+
+                        ScraperImage b = new ScraperImage(ScraperImage.Type.MOVIE_BACKDROP, movieTags.getTitle());
+                        b.setLargeUrl(img.url);
+                        b.setThumbUrl(img.url);
+                        b.generateFileNames(context);
+                        backdrops.add(b);
+                    }
+                }
+                if (!posters.isEmpty()) {
+                    movieTags.setPosters(posters);
+                }
+                if (!backdrops.isEmpty()) {
+                    movieTags.setBackdrops(backdrops);
+                }
+            }
+        } catch (Throwable t) {
+            log.warn("fetchStashDbArtworkForNfo: failed to fetch artwork: {}", t.getMessage());
+        }
+    }
 }

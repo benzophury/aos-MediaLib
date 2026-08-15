@@ -59,10 +59,30 @@ android {
         }
     }
 
+    def localProperties = new Properties()
+    def localPropFiles = [
+        rootProject.file("local.properties"),
+        file("local.properties"),
+        file("../local.properties")
+    ]
+    for (File f : localPropFiles) {
+        if (f.exists()) {
+            f.withInputStream { localProperties.load(it) }
+        }
+    }
+
+    def stashdbApiKey = project.findProperty("STASHDB_API_KEY") \
+        ?: project.findProperty("stashdbApiKey") \
+        ?: localProperties.getProperty("STASHDB_API_KEY") \
+        ?: localProperties.getProperty("stashdbApiKey") \
+        ?: System.getenv("STASHDB_API_KEY") \
+        ?: ""
+
     defaultConfig {
         minSdkVersion 23
         targetSdkVersion 36
         multiDexEnabled = true
+        buildConfigField "String", "STASHDB_API_KEY", "\"${stashdbApiKey}\""
     }
 
     tasks.withType(JavaCompile).configureEach {
@@ -93,6 +113,7 @@ android {
     buildFeatures {
         aidl = true
         renderScript = false
+        buildConfig = true
     }
     lint {
         abortOnError false // Set to false to only fail on fatal issues

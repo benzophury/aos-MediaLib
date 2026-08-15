@@ -59,6 +59,7 @@ public final class StashPreprocessor {
         KNOWN_STUDIOS.put("puretaboo", "Pure Taboo");
         KNOWN_STUDIOS.put("mydirtyuncle", "My Dirty Uncle");
         KNOWN_STUDIOS.put("povmasters", "POV Masters");
+        KNOWN_STUDIOS.put("hotgirlsraw", "HotGirlsRaw");
         KNOWN_STUDIOS.put("18lust", "18_Lust");
         KNOWN_STUDIOS.put("18_lust", "18_Lust");
         KNOWN_STUDIOS.put("blacked", "Blacked");
@@ -216,8 +217,9 @@ public final class StashPreprocessor {
         // 3. Underscore Format: YYYY-MM-DD_Studio_Performer_Title or Studio_Performer_Title
         String cleanName = name;
         if (info.date != null) {
-            cleanName = cleanName.replaceFirst("^(?:19\\d\\d|20\\d\\d)[-_.]\\d{2}[-_.]\\d{2}[-_.]?", "");
+            cleanName = cleanName.replaceFirst("^(?:19\\d\\d|20\\d\\d)[-_.]\\d{2}[-_.]\\d{2}", "");
         }
+        cleanName = cleanName.replaceAll("^[\\s_.-]+", "");
 
         String[] partsU = cleanName.split("_");
         info.title = cleanName.replace('_', ' ').trim();

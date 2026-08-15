@@ -139,9 +139,13 @@ public class StashDbClient {
     }
 
     public String getApiKey() {
-        if (mExplicitApiKey != null) return mExplicitApiKey;
+        if (mExplicitApiKey != null && !mExplicitApiKey.trim().isEmpty()) return mExplicitApiKey.trim();
         if (mContext != null) {
-            return PreferenceManager.getDefaultSharedPreferences(mContext).getString(PREF_STASHDB_API_KEY, "").trim();
+            String prefKey = PreferenceManager.getDefaultSharedPreferences(mContext).getString(PREF_STASHDB_API_KEY, "").trim();
+            if (!prefKey.isEmpty()) return prefKey;
+        }
+        if (com.archos.medialib.BuildConfig.STASHDB_API_KEY != null && !com.archos.medialib.BuildConfig.STASHDB_API_KEY.trim().isEmpty()) {
+            return com.archos.medialib.BuildConfig.STASHDB_API_KEY.trim();
         }
         return "";
     }
@@ -158,6 +162,7 @@ public class StashDbClient {
             "    performers { performer { id name gender disambiguation image_path } }\n" +
             "    tags { id name }\n" +
             "    images { id url width height }\n" +
+            "    paths { screenshot preview stream }\n" +
             "  }\n" +
             "}";
 
@@ -173,6 +178,7 @@ public class StashDbClient {
             "    performers { performer { id name gender disambiguation image_path } }\n" +
             "    tags { id name }\n" +
             "    images { id url width height }\n" +
+            "    paths { screenshot preview stream }\n" +
             "  }\n" +
             "}";
 
@@ -190,6 +196,7 @@ public class StashDbClient {
             "      performers { performer { id name gender disambiguation image_path } }\n" +
             "      tags { id name }\n" +
             "      images { id url width height }\n" +
+            "      paths { screenshot preview stream }\n" +
             "    }\n" +
             "  }\n" +
             "}";
@@ -330,6 +337,7 @@ public class StashDbClient {
 
             if (!apiKey.isEmpty()) {
                 reqBuilder.header("ApiKey", apiKey);
+                reqBuilder.header("Authorization", "ApiKey " + apiKey);
             }
 
             try (Response resp = mHttpClient.newCall(reqBuilder.build()).execute()) {
@@ -432,6 +440,41 @@ public class StashDbClient {
                         scene.images.add(img);
                     }
                 }
+            }
+        }
+
+        JSONObject pathsObj = json.optJSONObject("paths");
+        if (pathsObj != null) {
+            String screenshot = pathsObj.optString("screenshot", null);
+            if (screenshot != null && !screenshot.isEmpty()) {
+                StashImage img = new StashImage();
+                img.id = "screenshot";
+                img.url = screenshot;
+                scene.images.add(0, img);
+            }
+            String preview = pathsObj.optString("preview", null);
+            if (preview != null && !preview.isEmpty() && !preview.equals(screenshot)) {
+                StashImage img = new StashImage();
+                img.id = "preview";
+                img.url = preview;
+                scene.images.add(img);
+            }
+        }
+
+        if (scene.images.isEmpty()) {
+            for (StashPerformer p : scene.performers) {
+                if (p.imagePath != null && !p.imagePath.isEmpty()) {
+                    StashImage img = new StashImage();
+                    img.id = "performer_" + p.id;
+                    img.url = p.imagePath;
+                    scene.images.add(img);
+                }
+            }
+            if (scene.studio != null && scene.studio.imagePath != null && !scene.studio.imagePath.isEmpty()) {
+                StashImage img = new StashImage();
+                img.id = "studio_" + scene.studio.id;
+                img.url = scene.studio.imagePath;
+                scene.images.add(img);
             }
         }
 
