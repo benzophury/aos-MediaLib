@@ -91,6 +91,8 @@ public class NfoParser {
     public static final String NFO_EXTENSION = ".nfo";
     public static final String TV_SHOW_NFO = "tvshow.nfo";
     public static final String MOVIE_NFO = "movie.nfo";
+    public static final String SCENE_NFO = "scene.nfo";
+    public static final String STASH_NFO = "stash.nfo";
 
     public static final char[] STRING_SPLITTERS = { '|', ',', '/' };
 
@@ -230,6 +232,20 @@ public class NfoParser {
             if (fileOk(movieNfo)) {
                 result.videoFolder = videoParent;
                 result.videoNfo = movieNfo;
+                return result;
+            }
+            // 4. check for scene.nfo
+            Uri sceneNfo = Uri.withAppendedPath(videoParent, SCENE_NFO);
+            if (fileOk(sceneNfo)) {
+                result.videoFolder = videoParent;
+                result.videoNfo = sceneNfo;
+                return result;
+            }
+            // 5. check for stash.nfo
+            Uri stashNfo = Uri.withAppendedPath(videoParent, STASH_NFO);
+            if (fileOk(stashNfo)) {
+                result.videoFolder = videoParent;
+                result.videoNfo = stashNfo;
                 return result;
             }
         }

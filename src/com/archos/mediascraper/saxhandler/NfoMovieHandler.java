@@ -75,30 +75,47 @@ public class NfoMovieHandler extends BasicSubParseHandler {
     private static final int RELEASEDATE = 35;
     private static final int TRAILER = 36;
     private static final int UNIQUEID = 37;
+    private static final int PREMIERED = 38;
+    private static final int TAG_GENRE = 39;
+    private static final int PERFORMER = 40;
+    private static final int ORIGINALTITLE = 41;
+    private static final int DURATION = 42;
 
     static {
         STRINGS.addKey("movie", ROOT_MOVIE);
+        STRINGS.addKey("scene", ROOT_MOVIE);
+        STRINGS.addKey("xbmc", ROOT_MOVIE);
         STRINGS.addKey("title", TITLE);
+        STRINGS.addKey("originaltitle", ORIGINALTITLE);
         STRINGS.addKey("rating", RATING);
         STRINGS.addKey("year", YEAR);
         STRINGS.addKey("outline", OUTLINE);
         STRINGS.addKey("plot", PLOT);
+        STRINGS.addKey("details", PLOT);
         STRINGS.addKey("releasedate", RELEASEDATE);
+        STRINGS.addKey("premiered", PREMIERED);
         STRINGS.addKey("thumb", THUMB);
+        STRINGS.addKey("poster", THUMB);
         STRINGS.addKey("mpaa", MPAA);
         STRINGS.addKey("id", ID);
         STRINGS.addKey("genre", GENRE);
+        STRINGS.addKey("tag", TAG_GENRE);
+        STRINGS.addKey("tags", TAG_GENRE);
         STRINGS.addKey("director", DIRECTOR);
         STRINGS.addKey("writer", WRITER);
         STRINGS.addKey("actor", ACTOR);
+        STRINGS.addKey("performer", PERFORMER);
         STRINGS.addKey("name", NAME);
         STRINGS.addKey("role", ROLE);
         STRINGS.addKey("fanart", FANART);
         STRINGS.addKey("studio", STUDIO);
         STRINGS.addKey("tmdbid", TMDBID);
         STRINGS.addKey("uniqueid", UNIQUEID);
+        STRINGS.addKey("stash_id", UNIQUEID);
+        STRINGS.addKey("stashid", UNIQUEID);
         STRINGS.addKey("trailer", TRAILER);
         STRINGS.addKey("runtime", RUNTIME);
+        STRINGS.addKey("duration", DURATION);
         STRINGS.addKey("lastplayed", LASTPLAYED);
         STRINGS.addKey("resume", RESUME);
         STRINGS.addKey("bookmark", BOOKMARK);
@@ -107,7 +124,6 @@ public class NfoMovieHandler extends BasicSubParseHandler {
         STRINGS.addKey("streamdetails", STREAMDETAILS);
         STRINGS.addKey("video", VIDEO);
         STRINGS.addKey("durationinseconds", DURATIONINSECONDS);
-        // STRINGS.addKey("lastplayed", LASTPLAYED); // no way to use that atm
         STRINGS.addKey("set", SET);
         STRINGS.addKey("overview", OVERVIEW);
         STRINGS.addKey("posterLarge", POSTERLARGE);
@@ -204,6 +220,7 @@ public class NfoMovieHandler extends BasicSubParseHandler {
                         return true;
                     // these are text nodes, return true to get text
                     case TITLE:
+                    case ORIGINALTITLE:
                     case RATING:
                     case YEAR:
                     case OUTLINE:
@@ -211,19 +228,22 @@ public class NfoMovieHandler extends BasicSubParseHandler {
                     case MPAA:
                     case ID:
                     case GENRE:
+                    case TAG_GENRE:
                     case DIRECTOR:
                     case WRITER:
                     case STUDIO:
                     case TMDBID:
                     case RELEASEDATE:
+                    case PREMIERED:
                     case TRAILER:
                     case RUNTIME:
+                    case DURATION:
                     case LASTPLAYED:
                     case BOOKMARK:
                     case RESUME:
                     case PLOT:
                         return true;
-                    // actor needs sub node parsing
+                    // actor needs sub node parsing or direct text
                     case SET:
                         mInSet = true;
                         mInSetId = -1;
@@ -235,10 +255,11 @@ public class NfoMovieHandler extends BasicSubParseHandler {
                         mInSetBackdropThumb = null;
                         return true;
                     case ACTOR:
+                    case PERFORMER:
                         mInActor = true;
                         mActorName = null;
                         mActorRole = null;
-                        break;
+                        return true;
                     case FANART:
                         mInFanart = true;
                         break;
@@ -305,16 +326,51 @@ public class NfoMovieHandler extends BasicSubParseHandler {
             case 1:
                 switch (STRINGS.match(localName)) {
                     case TITLE:
-                        mMovie.setTitle(getString());
+                        String titleStr = getString();
+                        if (titleStr != null && !titleStr.trim().isEmpty()) {
+                            mMovie.setTitle(titleStr.trim());
+                        }
+                        break;
+                    case ORIGINALTITLE:
+                        String origTitle = getString();
+                        if (origTitle != null && !origTitle.trim().isEmpty()) {
+                            if (mMovie.getTitle() == null || mMovie.getTitle().trim().isEmpty()) {
+                                mMovie.setTitle(origTitle.trim());
+                            }
+                        }
                         break;
                     case RATING:
                         mMovie.setRating(getFloat());
                         break;
                     case YEAR:
-                        mMovie.setYear(getInt());
+                        int yearVal = getInt();
+                        if (yearVal > 0) {
+                            mMovie.setYear(yearVal);
+                        }
+                        break;
+                    case PREMIERED:
+                        String premiered = getString();
+                        if (premiered != null && !premiered.trim().isEmpty()) {
+                            premiered = premiered.trim();
+                            mMovie.setReleaseDate(premiered);
+                            if (mMovie.getYear() <= 0 && premiered.length() >= 4) {
+                                try {
+                                    mMovie.setYear(Integer.parseInt(premiered.substring(0, 4)));
+                                } catch (Exception ignored) {}
+                            }
+                        }
                         break;
                     case RELEASEDATE:
-                        mMovie.setReleaseDate(getString());
+                        String releaseDate = getString();
+                        if (releaseDate != null && !releaseDate.trim().isEmpty()) {
+                            releaseDate = releaseDate.trim();
+                            mMovie.setReleaseDate(releaseDate);
+                            if (mMovie.getYear() <= 0 && releaseDate.length() >= 4) {
+                                try {
+                                    mMovie.setYear(Integer.parseInt(releaseDate.substring(0, 4)));
+                                } catch (Exception ignored) {}
+                            }
+                        }
                         break;
                     case OUTLINE:
                         if (!mHasPlot) {
@@ -340,7 +396,11 @@ public class NfoMovieHandler extends BasicSubParseHandler {
                         mMovie.setImdbId(getString());
                         break;
                     case GENRE:
-                        mMovie.addGenreIfAbsent(getString(), NfoParser.STRING_SPLITTERS);
+                    case TAG_GENRE:
+                        String genreStr = getString();
+                        if (genreStr != null && !genreStr.trim().isEmpty()) {
+                            mMovie.addGenreIfAbsent(genreStr.trim(), NfoParser.STRING_SPLITTERS);
+                        }
                         break;
                     case DIRECTOR:
                         mMovie.addDirectorIfAbsent(getString(), NfoParser.STRING_SPLITTERS);
@@ -349,7 +409,12 @@ public class NfoMovieHandler extends BasicSubParseHandler {
                         mMovie.addWriterIfAbsent(getString(), NfoParser.STRING_SPLITTERS);
                         break;
                     case STUDIO:
-                        mMovie.addStudioIfAbsent(getString(), NfoParser.STRING_SPLITTERS);
+                        String studioStr = getString();
+                        if (studioStr != null && !studioStr.trim().isEmpty()) {
+                            studioStr = studioStr.trim();
+                            mMovie.addStudioIfAbsent(studioStr, NfoParser.STRING_SPLITTERS);
+                            mMovie.addDirectorIfAbsent(studioStr, NfoParser.STRING_SPLITTERS);
+                        }
                         break;
                     case TMDBID:
                         mMovie.setOnlineId(getLong());
@@ -357,10 +422,11 @@ public class NfoMovieHandler extends BasicSubParseHandler {
                     case UNIQUEID:
                         if ("tmdb".equalsIgnoreCase(mUniqueIdType)) {
                             mUniqueIdTmdb = getLong();
-                        } else if ("stashdb".equalsIgnoreCase(mUniqueIdType) || "stash".equalsIgnoreCase(mUniqueIdType)) {
+                        } else if ("stashdb".equalsIgnoreCase(mUniqueIdType) || "stash".equalsIgnoreCase(mUniqueIdType) || mUniqueIdType == null || mUniqueIdType.isEmpty()) {
                             String stashUuid = getString();
                             if (stashUuid != null && !stashUuid.isEmpty()) {
                                 mUniqueIdImdb = stashUuid.trim();
+                                mMovie.setImdbId(stashUuid.trim());
                             }
                         } else if ("imdb".equalsIgnoreCase(mUniqueIdType)) {
                             mUniqueIdImdb = getString();
@@ -374,14 +440,26 @@ public class NfoMovieHandler extends BasicSubParseHandler {
                         addTrailer(getString());
                         break;
                     case ACTOR:
+                    case PERFORMER:
                         mInActor = false;
-                        mMovie.addActorIfAbsent(mActorName, mActorRole);
+                        String directActor = getString();
+                        if (mActorName != null && !mActorName.trim().isEmpty()) {
+                            mMovie.addActorIfAbsent(mActorName.trim(), mActorRole);
+                        } else if (directActor != null && !directActor.trim().isEmpty()) {
+                            mMovie.addActorIfAbsent(directActor.trim(), (String) null);
+                        }
                         break;
                     case FANART:
                         mInFanart = false;
                         break;
                     case RUNTIME:
                         mMovie.setRuntime(getLong(), TimeUnit.MINUTES);
+                        break;
+                    case DURATION:
+                        long durationSec = getLong();
+                        if (durationSec > 0) {
+                            mMovie.setRuntime(durationSec / 60, TimeUnit.MINUTES);
+                        }
                         break;
                     case FILEINFO:
                         mInFileinfo = mInStreamdetails = mInVideo = false;
@@ -429,7 +507,14 @@ public class NfoMovieHandler extends BasicSubParseHandler {
                             mActorName = getString();
                             break;
                         case ROLE:
-                            mActorRole = getString();
+                            String roleStr = getString();
+                            if (roleStr != null) {
+                                roleStr = roleStr.trim();
+                                if (roleStr.equalsIgnoreCase("Actor") || roleStr.equalsIgnoreCase("Performer") || roleStr.equalsIgnoreCase("Self") || roleStr.equalsIgnoreCase("Starring")) {
+                                    roleStr = null;
+                                }
+                            }
+                            mActorRole = roleStr;
                             break;
                         default:
                             break;

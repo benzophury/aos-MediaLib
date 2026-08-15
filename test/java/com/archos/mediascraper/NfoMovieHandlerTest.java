@@ -51,6 +51,43 @@ public class NfoMovieHandlerTest {
         assertEquals("tt0137523", tags.getImdbId());
     }
 
+    @Test
+    public void parsesStashNfoFormat() throws Exception {
+        String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\" ?>\n"
+                + "<movie>\n"
+                + "    <title>She'll do anything to help her boyfriend from his boss</title>\n"
+                + "    <originaltitle>She'll do anything to help her boyfriend from his boss</originaltitle>\n"
+                + "    <studio>Big Cock Bully</studio>\n"
+                + "    <year>2026</year>\n"
+                + "    <premiered>2026-08-13</premiered>\n"
+                + "    <releasedate>2026-08-13</releasedate>\n"
+                + "    <runtime>33</runtime>\n"
+                + "    <duration>2003</duration>\n"
+                + "    <actor>\n"
+                + "        <name>Lawson Jones</name>\n"
+                + "        <role>Actor</role>\n"
+                + "        <type>Actor</type>\n"
+                + "    </actor>\n"
+                + "    <actor>\n"
+                + "        <name>Selina Imai</name>\n"
+                + "        <role>Actor</role>\n"
+                + "        <type>Actor</type>\n"
+                + "    </actor>\n"
+                + "    <uniqueid type=\"stashdb\" default=\"true\">019ffba9-44c1-70d1-af11-8e742cf2031d</uniqueid>\n"
+                + "</movie>";
+
+        MovieTags tags = parse(xml);
+
+        assertEquals("She'll do anything to help her boyfriend from his boss", tags.getTitle());
+        assertEquals("019ffba9-44c1-70d1-af11-8e742cf2031d", tags.getImdbId());
+        assertEquals(2026, tags.getYear());
+        assertEquals("2026-08-13", tags.getReleaseDate());
+        assertEquals("Big Cock Bully", tags.getDirectorsFormatted());
+        assertEquals("Big Cock Bully", tags.getStudiosFormatted());
+        assertEquals(33, tags.getRuntime(java.util.concurrent.TimeUnit.MINUTES));
+        assertEquals("Lawson Jones, Selina Imai", tags.getActorsFormatted());
+    }
+
     private static MovieTags parse(String xml) throws Exception {
         NfoMovieHandler handler = new NfoMovieHandler();
         NfoParser.getNewParser().parse(new ByteArrayInputStream(

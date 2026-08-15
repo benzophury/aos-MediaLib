@@ -47,10 +47,10 @@ public class NfoRootHandler extends BasicHandler {
             Attributes attributes) throws SAXException {
 
         if (hierarchyLevel == 0) {
-            if ("movie".equals(localName)) {
+            if ("movie".equalsIgnoreCase(localName) || "scene".equalsIgnoreCase(localName) || "video".equalsIgnoreCase(localName) || "xbmc".equalsIgnoreCase(localName)) {
                 mMovieHandler.startSubParse(mReader, this, uri, localName, qName, attributes);
             }
-            else if ("episodedetails".equals(localName)) {
+            else if ("episodedetails".equalsIgnoreCase(localName)) {
                 mEpisodeHandler.startSubParse(mReader, this, uri, localName, qName, attributes);
             }
         }
