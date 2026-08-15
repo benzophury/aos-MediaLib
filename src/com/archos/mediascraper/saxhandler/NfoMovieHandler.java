@@ -353,10 +353,9 @@ public class NfoMovieHandler extends BasicSubParseHandler {
                         if (premiered != null && !premiered.trim().isEmpty()) {
                             premiered = premiered.trim();
                             mMovie.setReleaseDate(premiered);
-                            if (mMovie.getYear() <= 0 && premiered.length() >= 4) {
-                                try {
-                                    mMovie.setYear(Integer.parseInt(premiered.substring(0, 4)));
-                                } catch (Exception ignored) {}
+                            if (mMovie.getYear() <= 0) {
+                                int extractedYear = extractYearFromDateString(premiered);
+                                if (extractedYear > 0) mMovie.setYear(extractedYear);
                             }
                         }
                         break;
@@ -365,10 +364,9 @@ public class NfoMovieHandler extends BasicSubParseHandler {
                         if (releaseDate != null && !releaseDate.trim().isEmpty()) {
                             releaseDate = releaseDate.trim();
                             mMovie.setReleaseDate(releaseDate);
-                            if (mMovie.getYear() <= 0 && releaseDate.length() >= 4) {
-                                try {
-                                    mMovie.setYear(Integer.parseInt(releaseDate.substring(0, 4)));
-                                } catch (Exception ignored) {}
+                            if (mMovie.getYear() <= 0) {
+                                int extractedYear = extractYearFromDateString(releaseDate);
+                                if (extractedYear > 0) mMovie.setYear(extractedYear);
                             }
                         }
                         break;
@@ -648,5 +646,16 @@ public class NfoMovieHandler extends BasicSubParseHandler {
             return mMovie;
         }
         return null;
+    }
+
+    private static int extractYearFromDateString(String dateStr) {
+        if (dateStr == null || dateStr.isEmpty()) return 0;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\b(19\\d\\d|20\\d\\d)\\b").matcher(dateStr);
+        if (m.find()) {
+            try {
+                return Integer.parseInt(m.group(1));
+            } catch (Exception ignored) {}
+        }
+        return 0;
     }
 }

@@ -88,6 +88,26 @@ public class NfoMovieHandlerTest {
         assertEquals("Lawson Jones, Selina Imai", tags.getActorsFormatted());
     }
 
+    @Test
+    public void parsesTextDatesCorrectly() throws Exception {
+        String xml = "<movie>\n"
+                + "    <title>Post-flight Tribbulance</title>\n"
+                + "    <studio>AdultTime.com</studio>\n"
+                + "    <premiered>Nov 14, 2025</premiered>\n"
+                + "    <actor>\n"
+                + "        <name>Scarlett Alexis</name>\n"
+                + "    </actor>\n"
+                + "</movie>";
+
+        MovieTags tags = parse(xml);
+        assertEquals("Post-flight Tribbulance", tags.getTitle());
+        assertEquals("AdultTime.com", tags.getDirectorsFormatted());
+        assertEquals("AdultTime.com", tags.getStudiosFormatted());
+        assertEquals(2025, tags.getYear());
+        assertEquals("Nov 14, 2025", tags.getReleaseDate());
+        assertEquals("Scarlett Alexis", tags.getActorsFormatted());
+    }
+
     private static MovieTags parse(String xml) throws Exception {
         NfoMovieHandler handler = new NfoMovieHandler();
         NfoParser.getNewParser().parse(new ByteArrayInputStream(
